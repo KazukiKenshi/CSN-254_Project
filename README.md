@@ -39,19 +39,19 @@ python manage.py runserver
 
 ## Guidelines on Committing Changes
 
-### When committing changes to the project, follow these guidelines:
+ When committing changes to the project, follow these guidelines:
 
-### Use Seperate Apps
+### 1. Use Seperate Apps
 
 Make your modules in separate Django apps to maintain code manageability. You can create a new app using the following command:
 
 ```bash
-python manage.py startapp appname
+python manage.py startapp _appname_
 ```
 
 This ensures that your project remains organized and scalable.
 
-### Updating Requirements.txt
+### 2. Updating Requirements.txt
 
 If you install any additional Python library, it's essential to update the requirements.txt file. To do this, run the following command:
 
