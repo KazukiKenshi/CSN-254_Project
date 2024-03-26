@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<head>
+    <title>Lumina</title>
+
+    <script type="importmap">
+    {
+      "imports": {
+	"three": "https://unpkg.com/three@0.147.0/build/three.module.js",
+	"three/addons/": "https://unpkg.com/three@0.147.0/examples/jsm/"
+      }
+    }
+    </script>
+    {% load static %}
+    <script type = "module" src = {% static 'Avatar/test.js' %} defer ></script>
+</head>
+<body bgcolor="#000000">
+   
+    <h1 style="color: white;">Model Loader</h1>
+    <div id="modelPath" style="display: none;">{% static "models/monkey.obj" %}</div>
+    <div id = 'scene-box'></div>
+</body>
+</html>
