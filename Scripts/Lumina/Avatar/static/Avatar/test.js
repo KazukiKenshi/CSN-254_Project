@@ -1,55 +1,54 @@
-// Import Three.js library
 import * as THREE from 'three';
-import * as Loader from 'three/addons/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-console.log("Hello world");
-
-// Create a scene
 const scene = new THREE.Scene();
 
-// Create a camera
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.z = 5;
+camera.position.z = 0;
 
-// Create a renderer
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Create a loader
-const loader = new Loader.OBJLoader();
-const modelPath = document.getElementById('modelPath').innerText;
-
+const loader = new GLTFLoader();
+const modelPath = document.getElementById("modelPath").textContent;
 let model;
-// Load a 3D model
+let mixer;
+
 loader.load(
     modelPath,
-    function (object) {
-        model = object;
-        scene.add(object);
+    function (gltf) {
+        model = gltf.scene;
+
+        scene.add(model);
+        model.position.z = -5;
+        mixer = new THREE.AnimationMixer(model);
+        gltf.animations.forEach((clip) => {
+            const action = mixer.clipAction(clip);
+            action.timeScale = 0; // Adjust this value to control the speed of the animation
+            action.play();
+        });
     },
-    function (xhr) {
-        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-    },
+    undefined,
     function (error) {
-        console.error('Error loading model:', error);
+        console.error('Error loading GLTF model', error);
     }
 );
 
-// Add lights
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
-
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-directionalLight.position.set(0, 1, 1);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 5);
+directionalLight.position.set(0, 5, 0);
 scene.add(directionalLight);
 
-// Render the scene
+const ambientLight = new THREE.AmbientLight(0xffffff, 0);
+scene.add(ambientLight);
+
 function animate() {
     requestAnimationFrame(animate);
-    if(model){
-        model.rotation.y += 0.01;
+    const deltaTime = clock.getDelta();
+    if (mixer) {
+        mixer.update(deltaTime);
     }
     renderer.render(scene, camera);
 }
+
 animate();
