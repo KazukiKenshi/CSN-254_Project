@@ -2,6 +2,10 @@
 
 ## How to Install
 
+### Step 0: Install Ollama
+
+Install ollama from this link. [Download Ollama](https://ollama.com/)
+
 ### Step 1: Install Python Virtual Environment
 
 First, you need to install Python virtual environment. Open a command prompt and run the following command:
