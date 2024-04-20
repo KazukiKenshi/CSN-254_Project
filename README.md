@@ -38,6 +38,7 @@ Navigate back to the Lumina folder in the Scripts directory and run the Django s
 
 ```bash
 cd Lumina
+ollam serve
 python manage.py runserver
 ```
 
