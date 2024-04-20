@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Speech to Text</title>
+</head>
+<body>
+    <h1>Speech to Text</h1>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit">Start Recording</button>
+    </form>
+    {% if query %}
+        <p>You said: {{ query }}</p>
+    {% endif %}
+</body>
+</html>
