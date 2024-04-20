@@ -1,7 +1,8 @@
 <!DOCTYPE html>
+<html>
 <head>
+  {% load static %}
     <title>Lumina</title>
-
     <script type="importmap">
     {
       "imports": {
@@ -10,13 +11,140 @@
       }
     }
     </script>
-    {% load static %}
-    <script type = "module" src = {% static 'Avatar/test.js' %} defer ></script>
+    <script type="module" src="{% static 'Avatar/test.js' %}" defer></script>
 </head>
-<body bgcolor="#000000">
-   
-    <h1 style="color: white;">Model Loader</h1>
-    <div id="modelPath" style="display: none;">{% static "models/ron.glb" %}</div>
-    <div id = 'scene-box'></div>
+<body bgcolor="#ffffff" style=" background-image: url('{% static "models/rin.png" %}'); background-size : cover ; background-repeat : no-repeat; background-attachment: fixed;">
+  <h1 style = "color: white;" >Model Loader</h1>
+  {% csrf_token %}
+  <div id="modelPath" style="display: none;">{% static "models/ron.glb" %}</div>
+  <div id='scene-box'></div>
+  
+  <div id="listening-status">Listening...</div>
+  <div id="transcription"></div>
+
+  <button id="toggle-listening">Stop Listening</button>
+
+  <div id="response"></div>
+
+  <audio id="audio-player" controls style="display: none;"></audio> <!-- Hidden audio player -->
+
+  <div id="myModal" class="modal">
+    <div class="modal-content">
+      <p>Do you want to listen to the audio?</p>
+      <button id="consentButton">Yes</button>
+    </div>
+  </div>
+  
+
+  <script>
+  var recognition;
+  var isListening = false;
+
+  function startListening() {
+      recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition)();
+      recognition.lang = 'en-IN'; 
+      recognition.onresult = function(event) {
+          var transcription = event.results[0][0].transcript;
+          document.getElementById('transcription').innerText = transcription;
+          fetchTranscription(transcription);
+      };
+      recognition.start();
+      isListening = true;
+      document.getElementById('toggle-listening').innerText = "Stop Listening";
+      document.getElementById('listening-status').innerText = "Listening...";
+  }
+
+  function stopListening() {
+      recognition.stop();
+      isListening = false;
+      document.getElementById('toggle-listening').innerText = "Start Listening";
+      document.getElementById('listening-status').innerText = "Not Listening";
+  }
+
+  function fetchTranscription(transcription) {
+      var csrftoken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+
+      fetch('/process-speech/', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrftoken  
+          },
+          body: JSON.stringify({ query: transcription }),
+      })
+      .then(response => {
+          if (!response.ok) {
+              throw new Error('Network response was not ok');
+          }
+          return response.json();
+      })
+      .then(data => {
+          console.log('Response:', data);
+          // Display the response in the HTML
+          document.getElementById('response').innerText = data.message;
+          // Play the audio response if available
+          if (data.audio_url) {
+              playAudio(data.audio_url);
+          }
+
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          // Optionally, handle error and start listening again
+          startListening();
+      });
+  }
+
+ // Get the modal
+// Get the modal
+var modal = document.getElementById("myModal");
+
+// Get the button that opens the modal
+var consentButton = document.getElementById("consentButton");
+
+// When the page loads, show the modal
+window.onload = function() {
+  modal.style.display = "block";
+}
+
+// When the user clicks the button, hide the modal and play the audio
+consentButton.onclick = function() {
+  modal.style.display = "none";
+  playAudio(null); // Pass the audioUrl as a parameter
+}
+
+function playAudio(audioUrl) {
+  var audioPlayer = document.getElementById('audio-player');
+  // Ensure that the audio player is visible before attempting to play
+
+  audioPlayer.style.display = 'none';
+  // Load the audio asynchronously
+  audioPlayer.src = audioUrl;
+  // Play the audio
+  audioPlayer.play();
+
+  // Event listener to detect when audio playback ends
+  audioPlayer.addEventListener('ended', function() {
+      // Hide the audio player
+      
+      // Start listening again
+      startListening();
+  });
+}
+
+
+
+
+
+  document.getElementById('toggle-listening').addEventListener('click', function(event) {
+      if (isListening) {
+          stopListening();
+      } else {
+          startListening();
+      }
+  });
+
+  startListening();
+  </script>
 </body>
 </html>

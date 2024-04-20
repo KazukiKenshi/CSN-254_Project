@@ -7,3 +7,4 @@ def test(request):
     context = {}
     
     return render(request,'Avatar/index.html',context)
+
