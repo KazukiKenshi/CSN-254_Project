@@ -9,6 +9,14 @@ import requests
 from django.http import FileResponse
 import gtts # type: ignore
 import os
+from groq import Groq
+import re
+
+#
+#
+#-------------- time the animations and expressions by slicing the response into sentences, adding the duration of audio file as the delay
+#               and playing files in sequence ----------------------------------
+#
 
 def process_speech(request):
     if request.method == 'POST':
@@ -17,7 +25,12 @@ def process_speech(request):
             query = data.get('query')
             # Perform any processing here...
             audio_url = generate_audio_url(query)  # Function to generate audio URL
-            response = llama(query)
+            rawResponse = llama(query)
+            print("Raw Response : ", rawResponse, " \n\n")
+            anim_data = animDataGenerator(rawResponse)
+            
+            response = anim_data['response']
+            
             
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
@@ -31,44 +44,18 @@ def process_speech(request):
             if isinstance(response, bytes):
                 response = response.decode('utf-8')
             
-            try:
-                response_json = json.loads(response)
-                content = response_json.get('message', {}).get('content')
-                if content:
-                    print("Response generated:")
-                    print(content)
-                    text_to_speech(content)
-                else:
-                    print("Invalid response format:", response_json)
-            except json.JSONDecodeError:
-                print("Invalid JSON format for response:", response)
-            
-            return JsonResponse({'message': query, 'audio_url': audio_url}, status=200)
+            print("Response generated:")
+            print(response)
+            text_to_speech(response)
+            expression = anim_data['expression'][0]
+            anim = anim_data['anim'][0]
+                
+            return JsonResponse({'message': query, 'audio_url': audio_url, 'expression' : expression, 'anim' : anim}, status=200)
         else:
             return JsonResponse({'error': 'Query not found in request'}, status=400)
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-# def process_speech(request):
-#     if request.method == 'POST':
-#         try:
-#             data = json.loads(request.body)
-#             query = data.get('query')
-#             # Perform any processing here...
-#             audio_url = generate_audio_url(query)  # Function to generate audio URL
-#         except json.JSONDecodeError:
-#             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-
-#         if query is not None:
-#             print("Message received:")
-#             print(query)
-#             print("Audio URL generated:")
-#             print(audio_url)
-#             return JsonResponse({'message': query, 'audio_url': audio_url}, status=200)
-#         else:
-#             return JsonResponse({'error': 'Query not found in request'}, status=400)
-
-#     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 def generate_audio_url(query):
     # Generate the audio file path based on the query
@@ -122,36 +109,32 @@ def speech_to_text(request):
 
 
 def llama(query):
+    client = Groq(
+        api_key="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",
+    )
+
+    chat = [
+            {
+                "role": "system",
+                "content": "You are a girl named Lumina a mental health counsellor. You are compassionate and cute. You include your expression and gesture at appropriate places, expression contained within # and gesture contained within $ like #smile# Hi there!. $wave$ I am Lumina .You only have neutral, happy, sad, smile, surprised, worried expressions. You only have idle, waving, angry, bashful, clap, thumbsUp gestures. Also reset the expression with neutral and gesture with idle whenever necessary."
+            }
+        ]
+
     
-
-    # Define the API endpoint URL
-    url = "http://localhost:11434/api/chat"
-
-    # Define the request payload
-    payload = {
-    "model": "llama3",
-    "stream" : False,
-    "messages": [
-        {
-        "role": "user",
-        "content": query
-        }
-    ]
-    }
-
-
-    # Make a POST request with payload
-    response = requests.post(url, json=payload)
-
-    # Check if the request was successful (status code 200)
-    if response.status_code == 200:
-        # Print the raw response content
-        # print("Raw Response:", response.content)
-        return response.content
-    else:
-        # Print an error message if the request failed
-        print("Error:", response.status_code)
-        return response.status_code
+    chat.append({"role" : "user", "content" : query})
+    
+    completion = client.chat.completions.create(
+    model="llama3-70b-8192",
+    messages=chat,
+    temperature=1,
+    max_tokens=1024,
+    top_p=1,
+    stream=False,
+    stop=None,
+    )
+    response = completion.choices[0].message.content;
+    print(response)
+    return response
     
     
 def text_to_speech(text):
@@ -187,4 +170,51 @@ def serve_audio(request):
         return FileResponse(open(audio_path, 'rb'), content_type='audio/mpeg')
     else:
         return HttpResponseNotFound("Audio file not found")
+
+
+def animDataGenerator(rawResponse):
     
+    
+    pattern1 = r'#(.*?)#'
+    pattern2 = r'\$(.*?)\$'
+
+    expressions = re.findall(pattern1, rawResponse)
+    animations = re.findall(pattern2, rawResponse)
+    response = re.sub(pattern1, '', rawResponse)
+    response = re.sub(pattern2, '', response)
+    
+    anim_data = {
+        'expression': expressions,
+        'anim': animations,
+        'response' : response
+    }
+    
+    return anim_data
+    
+    
+    
+    
+
+
+
+
+# def process_speech(request):
+#     if request.method == 'POST':
+#         try:
+#             data = json.loads(request.body)
+#             query = data.get('query')
+#             # Perform any processing here...
+#             audio_url = generate_audio_url(query)  # Function to generate audio URL
+#         except json.JSONDecodeError:
+#             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+
+#         if query is not None:
+#             print("Message received:")
+#             print(query)
+#             print("Audio URL generated:")
+#             print(audio_url)
+#             return JsonResponse({'message': query, 'audio_url': audio_url}, status=200)
+#         else:
+#             return JsonResponse({'error': 'Query not found in request'}, status=400)
+
+#     return JsonResponse({'error': 'Method not allowed'}, status=405)

@@ -8,12 +8,34 @@
   <title>Unity WebGL Player | Lumina</title>
   <link rel="shortcut icon" href="{% static 'TemplateData/favicon.ico' %}">
   <link rel="stylesheet" href="{% static 'TemplateData/style.css' %}">
+
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    #unity-container {
+      display: table;
+      width: 100%;
+      height: 100%;
+    }
+
+    #unity-canvas {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+
 </head>
 
 <body>
 
-  <div id="unity-container" class="unity-desktop">
-    <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+  <div id="unity-container" class="unity-desktop" >
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
     <div id="unity-loading-bar">
       <div id="unity-logo"></div>
       <div id="unity-progress-bar-empty">
@@ -21,20 +43,13 @@
       </div>
     </div>
     <div id="unity-warning"> </div>
-    <div id="unity-footer">
-      <div id="unity-webgl-logo"></div>
-      <div id="unity-fullscreen-button"></div>
-      <div id="unity-build-title">Lumina</div>
-    </div>
   </div>
 
   <script>
-    {% load static %}
     var container = document.querySelector("#unity-container");
     var canvas = document.querySelector("#unity-canvas");
     var loadingBar = document.querySelector("#unity-loading-bar");
     var progressBarFull = document.querySelector("#unity-progress-bar-full");
-    var fullscreenButton = document.querySelector("#unity-fullscreen-button");
     var warningBanner = document.querySelector("#unity-warning");
 
     // Shows a temporary message banner/ribbon for a few seconds, or
@@ -61,11 +76,11 @@
       updateBannerVisibility();
     }
 
-    var loaderUrl = "{% static 'Build/Lumina_client.loader.js' %}";
+    var loaderUrl = "{% static 'Build/Luminaclient.loader.js' %}";
     var config = {
-      dataUrl: "{% static 'Build/Lumina_client.data.gz' %}",
-      frameworkUrl: "{% static 'Build/Lumina_client.framework.js.gz' %}",
-      codeUrl: "{% static 'Build/Lumina_client.wasm.gz' %}",
+      dataUrl: "{% static 'Build/Luminaclient.data.gz' %}",
+      frameworkUrl: "{% static 'Build/Luminaclient.framework.js.gz' %}",
+      codeUrl: "{% static 'Build/Luminaclient.wasm.gz' %}",
       streamingAssetsUrl: "StreamingAssets",
       companyName: "DefaultCompany",
       productName: "Lumina",
@@ -96,32 +111,50 @@
 
 
     } else {
-      // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-
-      canvas.style.width = "960px";
-      canvas.style.height = "600px";
+      ;
     }
 
+    var unity_Instance;
+
     loadingBar.style.display = "block";
+    var testObj = { anim: "yawn", expression: "smile" };
+    var jsonString = JSON.stringify(testObj);
 
     var script = document.createElement("script");
     script.src = loaderUrl;
     script.onload = () => {
-      createUnityInstance(canvas, config, (progress) => {
+      console.log("Unity script loaded successfully");
+
+      var unityInstance = createUnityInstance(canvas, config, (progress) => {
         progressBarFull.style.width = 100 * progress + "%";
       }).then((unityInstance) => {
         loadingBar.style.display = "none";
-        fullscreenButton.onclick = () => {
-          unityInstance.SetFullscreen(1);
-        };
+        unity_Instance = unityInstance;
+        unityInstance.SendMessage('Lumina', 'JsonParser', jsonString);
+        testObj = { anim: "bashful", expression: "sad" };
+        jsonString = JSON.stringify(testObj);
+        playAnim(unityInstance, jsonString, 25000);
+        testObj = { anim: "none", expression: "neutral" };
+        jsonString = JSON.stringify(testObj);
+        playAnim(unityInstance, jsonString, 35000);
+
       }).catch((message) => {
         alert(message);
       });
     };
 
-    document.body.appendChild(script);
+    async function playAnim(unityInstance, json, delay) {
+      await new Promise(resolve => {
+        setTimeout(() => {
+          resolve();
+        }, delay);
+      });
+      unityInstance.SendMessage('Lumina', 'JsonParser', json);
+    }
 
+    document.body.appendChild(script);
   </script>
+
 </body>
 
 </html>
