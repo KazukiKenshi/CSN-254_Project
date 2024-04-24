@@ -9,14 +9,15 @@ import requests
 from django.http import FileResponse
 import gtts # type: ignore
 import os
-from groq import Groq
+from groq import Groq # type: ignore
 import re
+import pydub
+from pydub import AudioSegment
+import subprocess
+from .models import ChatMessage
 
-#
-#
-#-------------- time the animations and expressions by slicing the response into sentences, adding the duration of audio file as the delay
-#               and playing files in sequence ----------------------------------
-#
+
+
 
 def process_speech(request):
     if request.method == 'POST':
@@ -24,35 +25,33 @@ def process_speech(request):
             data = json.loads(request.body)
             query = data.get('query')
             # Perform any processing here...
-            audio_url = generate_audio_url(query)  # Function to generate audio URL
-            rawResponse = llama(query)
-            print("Raw Response : ", rawResponse, " \n\n")
-            anim_data = animDataGenerator(rawResponse)
-            
+              # Function to generate audio URL
+            raw_response = llama(query)
+            print("Raw Response:", raw_response,"\n")
+            anim_data = animDataGenerator(raw_response)
             response = anim_data['response']
-            
-            
+            animations = anim_data['anim']
+
+            if query is not None:
+                
+                audio_files = text_to_speech(response)
+                combine_audios(audio_files)
+                audio_url = generate_audio_url(query)
+                print("Message received:", query,"\n")
+                print("Audio URL generated:", audio_url,"\n")
+                print("Response generated:", response,"\n")
+
+                chat_message_user = ChatMessage(role='user', content=query)
+                chat_message_user.save()
+                chat_message_assistant = ChatMessage(role='assistant', content= "".join(response))
+                chat_message_assistant.save()
+
+                return JsonResponse({'message': query, 'audio_url': audio_url, 'anim': animations}, status=200)
+            else:
+                return JsonResponse({'error': 'Query not found in request'}, status=400)
+
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-
-        if query is not None:
-            print("Message received:")
-            print(query)
-            print("Audio URL generated:")
-            print(audio_url)
-            # Decode the response if it's in bytes format
-            if isinstance(response, bytes):
-                response = response.decode('utf-8')
-            
-            print("Response generated:")
-            print(response)
-            text_to_speech(response)
-            expression = anim_data['expression'][0]
-            anim = anim_data['anim'][0]
-                
-            return JsonResponse({'message': query, 'audio_url': audio_url, 'expression' : expression, 'anim' : anim}, status=200)
-        else:
-            return JsonResponse({'error': 'Query not found in request'}, status=400)
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -121,6 +120,12 @@ def llama(query):
         ]
 
     
+    
+    chat_messages = ChatMessage.objects.all()
+    
+    for message in chat_messages:
+        chat.append({"role" : message.role, "content" : message.content})
+        
     chat.append({"role" : "user", "content" : query})
     
     completion = client.chat.completions.create(
@@ -137,26 +142,49 @@ def llama(query):
     return response
     
     
-def text_to_speech(text):
-    if text:
-        # Convert text to string if it's in bytes format
-        if isinstance(text, bytes):
-            text = text.decode('utf-8')
-        
-        # Convert text to speech
-        tts = gtts.gTTS(text, lang="en")
-        
-        # Save the speech as an audio file
-        audio_file_path = os.path.join(settings.MEDIA_ROOT, 'speech.mp3')
-        tts.save(audio_file_path)
-        
-        # Render the template with the audio file path
-        print("audio file generated\n")
-    else:
-        print("no text provided\n")
+def text_to_speech(sentences):
+    audio_files = []
+    for idx, text in enumerate(sentences):
+        if text:
+            # Convert text to string if it's in bytes format
+            if isinstance(text, bytes):
+                text = text.decode('utf-8')
+            
+            # Convert text to speech
+            tts = gtts.gTTS(text, lang="en")
+            
+            # Save the speech as an audio file
+            audio_file_path = os.path.join(settings.MEDIA_ROOT, 'speech_' + str(idx) + '.mp3')
+            tts.save(audio_file_path)
+            
+            audio_files.append(audio_file_path)
+            print("Audio file generated:", audio_file_path,"\n")
+    return audio_files
+    
+    
 
+def combine_audios(audio_files):
+    
+    ffmpeg_path = os.path.join(settings.BIN_ROOT,'ffmpeg.exe')
+    output_path = os.path.join(settings.MEDIA_ROOT,'speech.mp3')
+    command = str(ffmpeg_path) + ' -y '
+    
+    for file in audio_files:
         
+        command += ' -i ' + str(file)
+    
+    command += ' -filter_complex "'
+    
+    for i in range(0, len(audio_files)):
+        command += '[' + str(i) + ':a]'
+    
+    command += 'concat=n=' + str(len(audio_files)) + ':v=0:a=1" '+str(output_path)
+    
+    print(command)
 
+    subprocess.run(command, shell=True)
+    
+    
 def serve_audio(request):
     # Extract the filename from the request URL
     # filename = request.path.split('/')[-1]
@@ -172,49 +200,46 @@ def serve_audio(request):
         return HttpResponseNotFound("Audio file not found")
 
 
-def animDataGenerator(rawResponse):
-    
-    
-    pattern1 = r'#(.*?)#'
-    pattern2 = r'\$(.*?)\$'
+def animDataGenerator(raw_response):
+    IsHash = False
+    IsDollar = False
+    dat = ""
+    animations = []
+    sentences = []
 
-    expressions = re.findall(pattern1, rawResponse)
-    animations = re.findall(pattern2, rawResponse)
-    response = re.sub(pattern1, '', rawResponse)
-    response = re.sub(pattern2, '', response)
-    
+    for ch in raw_response:
+        if ch == '#':
+            if IsHash:
+                IsHash = False
+                animDat = (dat.strip(), len(sentences))
+                animations.append(animDat)
+                dat = ""
+            else:
+                IsHash = True
+                if dat.strip() != "":
+                    sentences.append(dat.strip())
+                dat = ""
+        elif ch == '$':
+            if IsDollar:
+                IsDollar = False
+                animDat = (dat.strip(), len(sentences))
+                animations.append(animDat)
+                dat = ""
+            else:
+                IsDollar = True
+                if dat.strip() != "":
+                    sentences.append(dat.strip())
+                dat = ""
+        else:
+            dat += ch
+
+    if dat.strip() != "":
+        sentences.append(dat.strip())
+
     anim_data = {
-        'expression': expressions,
         'anim': animations,
-        'response' : response
+        'response': sentences
     }
-    
+
     return anim_data
     
-    
-    
-    
-
-
-
-
-# def process_speech(request):
-#     if request.method == 'POST':
-#         try:
-#             data = json.loads(request.body)
-#             query = data.get('query')
-#             # Perform any processing here...
-#             audio_url = generate_audio_url(query)  # Function to generate audio URL
-#         except json.JSONDecodeError:
-#             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-
-#         if query is not None:
-#             print("Message received:")
-#             print(query)
-#             print("Audio URL generated:")
-#             print(audio_url)
-#             return JsonResponse({'message': query, 'audio_url': audio_url}, status=200)
-#         else:
-#             return JsonResponse({'error': 'Query not found in request'}, status=400)
-
-#     return JsonResponse({'error': 'Method not allowed'}, status=405)

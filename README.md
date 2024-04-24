@@ -2,6 +2,8 @@
 
 ## How to Install
 
+### Install ffmpeg and to path variable
+
 ### Step 1: Install Python Virtual Environment
 
 First, you need to install Python virtual environment. Open a command prompt and run the following command:

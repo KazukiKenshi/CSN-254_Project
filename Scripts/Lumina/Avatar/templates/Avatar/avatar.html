@@ -141,7 +141,7 @@
             ;
         }
 
-        var unity_Instance;
+        
 
         loadingBar.style.display = "block";
         var testObj = {
@@ -155,6 +155,7 @@
         script.onload = () => {
             console.log("Unity script loaded successfully");
 
+            var unity_Instance;
             var unityInstance = createUnityInstance(canvas, config, (progress) => {
                 progressBarFull.style.width = 100 * progress + "%";
             }).then((unityInstance) => {
